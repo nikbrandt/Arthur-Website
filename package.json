@@ -1,0 +1,28 @@
+{
+  "name": "arthur-website",
+  "version": "1.0.0",
+  "description": "A website for the Discord bot, Arthur. Should be run as a child process of a running instance of Arthur.",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Gymnophoria/Arthur-Website.git"
+  },
+  "keywords": [
+    "arthur",
+    "discord",
+    "bot",
+    "website",
+    "express",
+    "webserver",
+    "jade"
+  ],
+  "author": "Gymnophoria",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Gymnophoria/Arthur-Website/issues"
+  },
+  "homepage": "https://github.com/Gymnophoria/Arthur-Website#readme"
+}
