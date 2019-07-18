@@ -59,7 +59,7 @@ function identifyAndCreateUser(oAuth) {
 }
 
 router.use((err, req, res, next) => {
-	if (err.code && err.code >= 500) console.error(err);
+	if (err.code && err.code >= 500) err._err ? console.error(err.message + '\n' + err._err) : console.log(err);
 	res.status(err.code || 500);
 
 	if (req.accepts('html')) {
