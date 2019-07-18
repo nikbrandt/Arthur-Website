@@ -10,7 +10,7 @@ router.use((req, res, next) => {
 	let path = req.originalUrl;
 	if (path.includes('discord')) next();
 	
-	next(new NotFound(`Could not find ${path}.`))
+	next(new NotFound(`Could not find ${path}.`));
 });
 
 router.use((err, req, res, next) => {
