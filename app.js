@@ -53,7 +53,7 @@ app.use(session({
 	cookie: {
 		secure: PRODUCTION,
 		sameSite: 'lax',
-		maxAge: 1000 * 60 * 30
+		maxAge: 1000 * 60 * 60 * 24 * 7
 	}
 }));
 
@@ -93,10 +93,6 @@ app.use((req, res) => {
 
 app.use((err, req, res, next) => {
 	console.error(err);
-	next(err);
-});
-
-app.use((err, req, res, next) => {
 	res.status(500);
 	
 	if (req.accepts('html')) {

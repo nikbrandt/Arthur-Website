@@ -1,15 +1,12 @@
 const { Router } = require('express');
 const crypto = require('crypto');
-const request = require('request');
 
-const models = require('../../models');
+const { UnprocessableEntity } = require('../../libraries/errors');
+const { getToken, identifyUser, redirectURI, endpoint } = require('../../libraries/discord');
+const { User, DiscordOAuth } = require('../../models');
 const config = require('../../../media/config.json');
-const redirectURI = (process.argv[2] === 'dev' ? `http://localhost:${config.website.port}` : config.website.hostname) + '/api/discord/callback';
-const api = 'https://discordapp.com/api/v6';
 
 const router = Router();
-
-// TODO: Implement Discord OAuth2 API here
 
 function hash(text) {
 	return crypto.createHash('md5').update(text).digest('hex');
@@ -17,79 +14,60 @@ function hash(text) {
 
 router.get('/authorize', (req, res) => {
 	const state = hash(req.sessionID);
-	res.redirect(`${api}/oauth2/authorize?client_id=${config.website.client_id}&redirect_uri=${encodeURIComponent(redirectURI)}&response_type=code&scope=identify%20guilds&prompt=none&state=${state}`);
+	
+	res.redirect(`${endpoint}/oauth2/authorize?client_id=${config.website.client_id}&redirect_uri=${encodeURIComponent(redirectURI)}&response_type=code&scope=identify%20guilds&prompt=none&state=${state}`);
 });
 
-router.get('/callback', (req, res, next) => {
-	if (!req.query.code) throw new Error('No code provided');
-	if (!req.query.state) throw new Error('No state returned');
+router.get('/callback', async (req, res, next) => {
+	if (!req.query.code) return next(new UnprocessableEntity('No code provided from Discord. '));
+	if (!req.query.state) return next(new UnprocessableEntity('No state returned'));
 	const state = hash(req.sessionID);
-	if (state !== req.query.state) throw new Error('States returned do not match.');
+	if (state !== req.query.state) return next(new UnprocessableEntity('States returned do not match. That\'s not a good thing.'));
 	
 	const code = req.query.code;
 	
-	const options = {
-		method: 'POST',
-		url: api + '/oauth2/token',
-		form: {
-			client_id: config.website.client_id,
-			client_secret: config.website.secrets.discordClient,
-			grant_type: 'authorization_code',
-			code: code,
-			redirect_uri: redirectURI,
-			scope: 'identify guild'
-		}
-	};
+	let body = await getToken(code, false).catch(next);
+	let expiry = Date.now() + body.expires_in * 1000;
 	
-	request(options, async (err, resp, body) => {
-		if (err) return next(err); // TODO: Differentiate between public errors and internal errors (e.g. this is internal)
-		
-		if (!body) return next('Could not get discord JSON body for token');
-		
-		try {
-			body = JSON.parse(body);
-		} catch (e) {
-			return next(e);
-		}
-		
-		console.log(body);
-
-		let oAuth = await models.DiscordOAuth.createNew(body.access_token, Date.now() + body.expires_in * 1000, body.refresh_token);
-		
-		identifyUser(oAuth).then(async user => {
-			console.log(user);
-			
-			let userModel = await models.User.createNew(user.id, user.username, user.discriminator, user.avatar, oAuth);
-			req.session.userID = user.id;
-
-			res.redirect('/');
-		}).catch(next);
+	let [ oAuth, created ] = await DiscordOAuth.findOrCreate({
+		where: { accessToken: body.access_token, refreshToken: body.refresh_token }, 
+		defaults: { accessTokenExpiry: expiry }
 	});
+	
+	if (created) {
+		req.session.userID = await identifyAndCreateUser(oAuth).catch(next);
+	} else {
+		let [, user] = await Promise.all([ oAuth.update({ accessTokenExpiry: expiry }), oAuth.getUser() ]);
+		
+		req.session.userID = user ? await user.get('discordID') : await identifyAndCreateUser(oAuth);
+	}
+	
+	res.redirect('/');
 });
 
-function identifyUser(oAuth) {
-	return new Promise((resolve, reject) => {
-		const options = {
-			method: 'GET',
-			uri: api + '/users/@me',
-			headers: {
-				'User-Agent': `Arthur Discord Bot Website (${config.website.hostname}, 1.0)`,
-				'Authorization': `Bearer ${oAuth.get('accessToken')}`
-			}
-		};
-
-		request(options, (err, resp, body) => {
-			if (err) return reject(err);
-			if (!body) return reject('No discord API body');
-			
-			try {
-				body = JSON.parse(body);
-				return resolve(body);
-			} catch (e) {
-				return reject(e);
-			}
-		});
+/**
+ * Identify user through the Discord API and create a User object with info
+ * @param oAuth The DiscordOAuth object to assign to the user
+ * @returns Promise<string> userID The user's Discord ID
+ */
+function identifyAndCreateUser(oAuth) {
+	return new Promise(async (resolve, reject) => {
+		let user = await identifyUser(oAuth).catch(reject);
+		await User.createNew(user.id, user.username, user.discriminator, user.avatar, oAuth);
+		return resolve(user.id);
 	});
 }
+
+router.use((err, req, res, next) => {
+	if (err.code && err.code >= 500) console.error(err);
+	res.status(err.code || 500);
+
+	if (req.accepts('html')) {
+		res.render('message', {
+			message: err.message || 'Internal Server Error',
+			subMessage: 'Something broke on our end. Sorry \'bout that.'
+		});
+	}
+});
 
 module.exports = router;

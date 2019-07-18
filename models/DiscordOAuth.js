@@ -1,3 +1,5 @@
+const { getToken } = require('../libraries/discord');
+
 const discordOAuth = (sequelize, DataTypes) => {
 	let DiscordOAuth = sequelize.define('DiscordOAuth', {
 		accessToken: {
@@ -20,6 +22,24 @@ const discordOAuth = (sequelize, DataTypes) => {
 			DiscordOAuth.create({
 				accessToken, accessTokenExpiry, refreshToken
 			}).then(resolve).catch(reject);
+		});
+	};
+	
+	DiscordOAuth.prototype.getValidToken = function () {
+		let outerThis = this;
+		
+		return new Promise(async (resolve, reject) => {
+			if (outerThis.accessTokenExpiry.getTime() - Date.now() > 5000) return resolve(outerThis.accessToken);
+
+			let body = await getToken(outerThis.refreshToken, true).catch(reject);
+
+			await outerThis.update({
+				accessToken: body.access_token,
+				refreshToken: body.refresh_token,
+				accessTokenExpiry: Date.now() + body.expires_in * 1000
+			});
+
+			return resolve(body.access_token);
 		});
 	};
 	
