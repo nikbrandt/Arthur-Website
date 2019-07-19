@@ -65,7 +65,6 @@ app.use((req, res, next) => { // logger/all requests
 	let path = req.originalUrl;
 
 	console.info(`${moment().format('MM/DD/YY H:mm:ss')} -- ${method} request from ${ip} at ${path}`);
-	console.log(req.session);
 	next();
 });
 

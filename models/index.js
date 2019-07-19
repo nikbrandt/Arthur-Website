@@ -9,7 +9,8 @@ let db = {};
 const sequelize = new Sequelize({
 	dialect: 'sqlite',
 	storage: path.join(__dirname, '..', '..', 'media', 'website-db.sqlite')/*,
-	logging: true*/
+	logging: true*/,
+	transactionType: 'IMMEDIATE'
 });
 
 fs.readdirSync(__dirname).filter(file => {
