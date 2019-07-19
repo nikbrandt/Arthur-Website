@@ -7,10 +7,10 @@ const redirectURI = (process.argv[2] === 'dev' ? `http://localhost:${config.webs
 const endpoint = 'https://discordapp.com/api/v6';
 
 /**
- * Get a discord token and other associated information
- * @param code The code or refresh token being used to get a new token
- * @param refresh Whether or not `code` is a refresh token. Truthy values mean that it is.
- * @returns Promise<object> body The JSON response from Discord
+ * Get a discord token and other associated information with a code or refresh token.
+ * @param {String} code The code or refresh token being used to get a new token
+ * @param {Boolean} refresh Whether or not `code` is a refresh token. Truthy values mean that it is.
+ * @returns {Promise<Object>} body The JSON response from Discord
  */
 function getToken(code, refresh) {
 	return new Promise((resolve, reject) => {
@@ -43,6 +43,11 @@ function getToken(code, refresh) {
 	});
 }
 
+/**
+ * Send a request to the Discord API /users/@me to identify the user of an OAuth token.
+ * @param {DiscordOAuth} oAuth The DiscordOAuth instance with a valid token to identify the user with.
+ * @returns {Promise<Object>} body The body returned from Discord, including id, username, discrim, and more.
+ */
 function identifyUser(oAuth) {
 	return new Promise(async (resolve, reject) => {
 		const token = await oAuth.getValidToken().catch(reject);
